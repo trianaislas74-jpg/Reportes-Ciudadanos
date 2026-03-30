@@ -1,136 +1,161 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visor de Atención Ciudadana | Mérida</title>
-    
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Fraunces:wght@700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Visor de Atención Ciudadana | Mérida</title>
 
-    <style>
-        :root {
-            --verde-cerrado: #1e5d3b; 
-            --amarillo-abierto: #f59e0b;
-            --fondo: #f8fafc;
-            --texto: #0f172a;
-            --gris: #64748b;
-            --borde: #e2e8f0;
-        }
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Fraunces:wght@700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'DM Sans', sans-serif; background: var(--fondo); color: var(--texto); height: 100vh; display: flex; flex-direction: column; }
+<style>
+:root {
+    --verde-cerrado:#1e5d3b;
+    --amarillo-abierto:#f59e0b;
+    --fondo:#f8fafc;
+    --texto:#0f172a;
+    --gris:#64748b;
+    --borde:#e2e8f0;
+}
 
-        header {
-            background: white; padding: 15px 4%; border-bottom: 1px solid var(--borde);
-            display: flex; justify-content: space-between; align-items: center; z-index: 1000;
-        }
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'DM Sans',sans-serif;background:var(--fondo);color:var(--texto);height:100vh;display:flex;flex-direction:column;}
 
-        .brand h1 { font-family: 'Fraunces', serif; font-size: 1.2rem; color: var(--verde-cerrado); }
-        .brand p { font-size: 0.7rem; color: var(--gris); text-transform: uppercase; letter-spacing: 1px; }
+header{background:white;padding:15px 4%;border-bottom:1px solid var(--borde);display:flex;justify-content:space-between;align-items:center;}
 
-        .content { display: flex; flex: 1; overflow: hidden; }
+.brand h1{font-family:'Fraunces',serif;font-size:1.2rem;color:var(--verde-cerrado);}
+.brand p{font-size:0.7rem;color:var(--gris);text-transform:uppercase;}
 
-        .sidebar { width: 400px; background: white; border-right: 1px solid var(--borde); display: flex; flex-direction: column; padding: 20px; }
+.content{display:flex;flex:1;overflow:hidden;}
 
-        .search-box { background: #f1f5f9; border-radius: 12px; padding: 12px; display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
-        .search-box input { border: none; background: transparent; outline: none; width: 100%; font-family: inherit; font-size: 0.9rem; }
+.sidebar{width:400px;background:white;border-right:1px solid var(--borde);display:flex;flex-direction:column;padding:20px;}
 
-        .report-list { overflow-y: auto; flex: 1; }
-        .card { border: 1px solid var(--borde); border-radius: 12px; padding: 15px; margin-bottom: 12px; cursor: pointer; transition: 0.2s; background: white; }
-        .card:hover { border-color: var(--verde-cerrado); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+.search-box{background:#f1f5f9;border-radius:12px;padding:12px;display:flex;gap:10px;margin-bottom:20px;}
+.search-box input{border:none;background:transparent;outline:none;width:100%;}
 
-        .status { font-size: 0.65rem; font-weight: 800; text-transform: uppercase; padding: 4px 10px; border-radius: 20px; display: inline-block; margin-bottom: 10px; }
-        .status.abierto { background: #fef3c7; color: #92400e; border: 1px solid var(--amarillo-abierto); }
-        .status.cerrado { background: #dcfce7; color: #166534; border: 1px solid var(--verde-cerrado); }
+.report-list{overflow-y:auto;flex:1;}
+.card{border:1px solid var(--borde);border-radius:12px;padding:15px;margin-bottom:12px;cursor:pointer;}
+.card:hover{border-color:var(--verde-cerrado);}
 
-        #map { flex: 1; }
-        .loading-overlay { position: fixed; top: 72px; left: 0; width: 100%; height: 100%; background: white; z-index: 5000; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: 0.5s; }
+.status{font-size:0.65rem;font-weight:800;padding:4px 10px;border-radius:20px;margin-bottom:10px;display:inline-block;}
+.status.abierto{background:#fef3c7;color:#92400e;}
+.status.cerrado{background:#dcfce7;color:#166534;}
 
-        .spin { animation: spin 2s linear infinite; }
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-    </style>
+#map{flex:1;}
+
+.loading-overlay{
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:white;
+display:flex;
+justify-content:center;
+align-items:center;
+z-index:9999;
+}
+
+.spin{animation:spin 2s linear infinite;}
+@keyframes spin{from{transform:rotate(0);}to{transform:rotate(360deg);}}
+</style>
 </head>
+
 <body>
 
 <div class="loading-overlay" id="loader">
-    <i data-lucide="refresh-cw" class="spin" size="40" color="#1e5d3b"></i>
-    <p style="margin-top: 15px; font-weight: 500;">Cargando datos...</p>
+<i data-lucide="refresh-cw" class="spin" size="40"></i>
 </div>
 
 <header>
-    <div class="brand">
-        <h1>Plataforma de Seguimiento</h1>
-        <p>Regiduría de Mérida</p>
-    </div>
+<div class="brand">
+<h1>Plataforma de Seguimiento</h1>
+<p>Mérida</p>
+</div>
 </header>
 
 <div class="content">
-    <aside class="sidebar">
-        <div class="search-box">
-            <i data-lucide="search" size="18" color="#64748b"></i>
-            <input type="text" id="filterInput" placeholder="Busca tu colonia..." onkeyup="filtrar()">
-        </div>
-        <div class="report-list" id="lista"></div>
-    </aside>
-    <div id="map"></div>
+<aside class="sidebar">
+<div class="search-box">
+<input type="text" id="filterInput" placeholder="Busca colonia..." onkeyup="filtrar()">
+</div>
+<div id="lista" class="report-list"></div>
+</aside>
+
+<div id="map"></div>
 </div>
 
 <script>
 lucide.createIcons();
 
-const map = L.map('map', { zoomControl: false }).setView([20.967, -89.623], 12);
-L.control.zoom({ position: 'bottomright' }).addTo(map);
+const map = L.map('map').setView([20.967,-89.623],12);
 L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
 
-async function init() {
-    try {
-        const response = await fetch("data.json");
-        const reportes = await response.json();
-
-        renderizar(reportes);
-    } catch (e) {
-        console.error(e);
-        alert("Error cargando datos");
-    } finally {
-        document.getElementById('loader').style.display = 'none';
-    }
+function coordsValidas(lat,lng){
+return !isNaN(lat) && !isNaN(lng) &&
+lat>=20.8 && lat<=21.2 &&
+lng>=-89.8 && lng<=-89.5;
 }
 
-function renderizar(data) {
-    const lista = document.getElementById('lista');
-    lista.innerHTML = '';
+async function init(){
+try{
+const res = await fetch("data.json");
+const data = await res.json();
 
-    data.forEach(rep => {
-        const color = rep.status === 'cerrado' ? '#1e5d3b' : '#f59e0b';
+const filtrados = data.map(rep=>{
+const lat = parseFloat(rep.coords[0]);
+const lng = parseFloat(rep.coords[1]);
 
-        const card = document.createElement('div');
-        card.className = 'card';
-        card.innerHTML = `
-            <span class="status ${rep.status}">${rep.status}</span>
-            <h3>${rep.asunto}</h3>
-            <p><b>Colonia:</b> ${rep.colonia}</p>
-        `;
-        card.onclick = () => map.flyTo(rep.coords, 16);
-        lista.appendChild(card);
+return coordsValidas(lat,lng)
+? {...rep, coords:[lat,lng]}
+: null;
+}).filter(Boolean);
 
-        L.circleMarker(rep.coords, {
-            radius: 9,
-            fillColor: color,
-            color: "white",
-            weight: 2,
-            fillOpacity: 0.9
-        }).addTo(map);
-    });
+renderizar(filtrados);
+
+}catch(e){
+console.error(e);
+alert("Error cargando datos");
+}finally{
+document.getElementById('loader').style.display="none";
+}
 }
 
-function filtrar() {
-    const val = document.getElementById('filterInput').value.toLowerCase();
-    document.querySelectorAll('.card').forEach(c => {
-        c.style.display = c.innerText.toLowerCase().includes(val) ? "block" : "none";
-    });
+function renderizar(data){
+const lista = document.getElementById('lista');
+lista.innerHTML="";
+
+data.forEach(rep=>{
+const color = rep.status==="cerrado"?"#1e5d3b":"#f59e0b";
+
+const card = document.createElement('div');
+card.className="card";
+card.innerHTML=`
+<span class="status ${rep.status}">${rep.status}</span>
+<h3>${rep.asunto}</h3>
+<p>${rep.colonia}</p>
+`;
+
+card.onclick=()=>map.flyTo(rep.coords,16);
+lista.appendChild(card);
+
+L.circleMarker(rep.coords,{
+radius:8,
+fillColor:color,
+color:"white",
+weight:2,
+fillOpacity:0.9
+}).addTo(map);
+});
+}
+
+function filtrar(){
+const val=document.getElementById('filterInput').value.toLowerCase();
+document.querySelectorAll('.card').forEach(c=>{
+c.style.display=c.innerText.toLowerCase().includes(val)?"block":"none";
+});
 }
 
 init();
