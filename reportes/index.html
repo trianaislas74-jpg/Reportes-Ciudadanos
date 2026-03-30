@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visor de Atención Ciudadana | Mérida</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Fraunces:wght@700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        :root {
+            --verde-cerrado: #1e5d3b; 
+            --amarillo-abierto: #f59e0b;
+            --fondo: #f8fafc;
+            --texto: #0f172a;
+            --gris: #64748b;
+            --borde: #e2e8f0;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'DM Sans', sans-serif; background: var(--fondo); color: var(--texto); height: 100vh; display: flex; flex-direction: column; }
+
+        header {
+            background: white; padding: 15px 4%; border-bottom: 1px solid var(--borde);
+            display: flex; justify-content: space-between; align-items: center; z-index: 1000;
+        }
+
+        .brand h1 { font-family: 'Fraunces', serif; font-size: 1.2rem; color: var(--verde-cerrado); }
+        .brand p { font-size: 0.7rem; color: var(--gris); text-transform: uppercase; letter-spacing: 1px; }
+
+        .content { display: flex; flex: 1; overflow: hidden; }
+
+        .sidebar { width: 400px; background: white; border-right: 1px solid var(--borde); display: flex; flex-direction: column; padding: 20px; }
+
+        .search-box { background: #f1f5f9; border-radius: 12px; padding: 12px; display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+        .search-box input { border: none; background: transparent; outline: none; width: 100%; font-family: inherit; font-size: 0.9rem; }
+
+        .report-list { overflow-y: auto; flex: 1; }
+        .card { border: 1px solid var(--borde); border-radius: 12px; padding: 15px; margin-bottom: 12px; cursor: pointer; transition: 0.2s; background: white; }
+        .card:hover { border-color: var(--verde-cerrado); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+
+        .status { font-size: 0.65rem; font-weight: 800; text-transform: uppercase; padding: 4px 10px; border-radius: 20px; display: inline-block; margin-bottom: 10px; }
+        .status.abierto { background: #fef3c7; color: #92400e; border: 1px solid var(--amarillo-abierto); }
+        .status.cerrado { background: #dcfce7; color: #166534; border: 1px solid var(--verde-cerrado); }
+
+        #map { flex: 1; }
+        .loading-overlay { position: fixed; top: 72px; left: 0; width: 100%; height: 100%; background: white; z-index: 5000; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: 0.5s; }
+    </style>
+</head>
+<body>
+
+    <div class="loading-overlay" id="loader">
+        <i data-lucide="refresh-cw" class="spin" size="40" color="#1e5d3b"></i>
+        <p style="margin-top: 15px; font-weight: 500;">Sincronizando con base de datos...</p>
+    </div>
+
+    <header>
+        <div class="brand">
+            <h1>Plataforma de Seguimiento</h1>
+            <p>Regiduría de Mérida</p>
+        </div>
+        <div id="sync-status" style="font-size: 0.75rem; color: var(--gris); display: flex; align-items: center; gap: 5px;">
+            <i data-lucide="check-circle" size="14" color="#10b981"></i> Datos en vivo de Google Sheets
+        </div>
+    </header>
+
+    <div class="content">
+        <aside class="sidebar">
+            <div class="search-box">
+                <i data-lucide="search" size="18" color="#64748b"></i>
+                <input type="text" id="filterInput" placeholder="Busca tu colonia (ej. Chuburná)..." onkeyup="filtrar()">
+            </div>
+            <div class="report-list" id="lista"></div>
+        </aside>
+        <div id="map"></div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+        const map = L.map('map', { zoomControl: false }).setView([20.967, -89.623], 12);
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
+
+        const URL_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRkEy6YtGU6girlcwubsaMtjWgHmpVUHpV1o0wOtm0xqE_34EfLeUyVigQyMJT9SNlvuvKXwD4MF5e7/pub?gid=337736091&single=true&output=csv";
+
+        async function init() {
+            try {
+                const response = await fetch(URL_CSV);
+                const dataText = await response.text();
+                const filas = dataText.split('\n').slice(1); // Omitir encabezado
+
+                const reportes = filas.map(fila => {
+                    const col = fila.split(',');
+                    // Mapeo sugerido según tu estructura de Excel:
+                    return {
+                        folio: col[0] || 'S/N',
+                        asunto: col[1] || 'Sin asunto',
+                        ciudadano: col[2] || 'Anónimo',
+                        colonia: col[3] || 'No especificada',
+                        status: (col[4] || 'abierto').toLowerCase().trim(),
+                        dependencia: col[5] || 'Pendiente',
+                        antiguedad: col[6] || 'Reciente',
+                        // Asumimos que agregas Latitud y Longitud al final o una columna con coordenadas
+                        coords: [parseFloat(col[7]) || 20.967, parseFloat(col[8]) || -89.623]
+                    };
+                }).filter(r => r.asunto !== 'Sin asunto');
+
+                renderizar(reportes);
+                document.getElementById('loader').style.opacity = '0';
+                setTimeout(() => document.getElementById('loader').style.display = 'none', 500);
+            } catch (e) {
+                console.error("Error cargando datos:", e);
+                alert("Hubo un problema al conectar con el servidor de datos.");
+            }
+        }
+
+        function renderizar(data) {
+            const lista = document.getElementById('lista');
+            lista.innerHTML = '';
+            
+            data.forEach(rep => {
+                const color = rep.status === 'cerrado' ? '#1e5d3b' : '#f59e0b';
+                
+                // Card Sidebar
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `
+                    <span class="status ${rep.status}">${rep.status}</span>
+                    <h3 style="font-size:0.9rem;">${rep.asunto}</h3>
+                    <p style="font-size:0.75rem; color:var(--gris); margin-top:5px;">
+                        <b>Folio:</b> ${rep.folio} | <b>Colonia:</b> ${rep.colonia}
+                    </p>
+                `;
+                card.onclick = () => map.flyTo(rep.coords, 16);
+                lista.appendChild(card);
+
+                // Pin Mapa
+                L.circleMarker(rep.coords, {
+                    radius: 9, fillColor: color, color: "white", weight: 2, fillOpacity: 0.9
+                }).addTo(map).bindPopup(`
+                    <div style="padding:5px">
+                        <b style="color:${color}; text-transform:uppercase">${rep.status}</b><br>
+                        <b>Asunto:</b> ${rep.asunto}<br>
+                        <b>Dependencia:</b> ${rep.dependencia}<br>
+                        <hr style="margin:5px 0; border:0; border-top:1px solid #eee">
+                        <small>Folio: ${rep.folio} | ${rep.antiguedad}</small>
+                    </div>
+                `);
+            });
+        }
+
+        function filtrar() {
+            const val = document.getElementById('filterInput').value.toLowerCase();
+            document.querySelectorAll('.card').forEach(c => {
+                c.style.display = c.innerText.toLowerCase().includes(val) ? "block" : "none";
+            });
+        }
+
+        init();
+    </script>
+
+    <style>
+        .spin { animation: spin 2s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    </style>
+</body>
+</html>
