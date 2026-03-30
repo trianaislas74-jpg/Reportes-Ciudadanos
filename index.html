@@ -48,123 +48,93 @@
 
         #map { flex: 1; }
         .loading-overlay { position: fixed; top: 72px; left: 0; width: 100%; height: 100%; background: white; z-index: 5000; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: 0.5s; }
+
+        .spin { animation: spin 2s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
-    <div class="loading-overlay" id="loader">
-        <i data-lucide="refresh-cw" class="spin" size="40" color="#1e5d3b"></i>
-        <p style="margin-top: 15px; font-weight: 500;">Sincronizando con base de datos...</p>
+<div class="loading-overlay" id="loader">
+    <i data-lucide="refresh-cw" class="spin" size="40" color="#1e5d3b"></i>
+    <p style="margin-top: 15px; font-weight: 500;">Cargando datos...</p>
+</div>
+
+<header>
+    <div class="brand">
+        <h1>Plataforma de Seguimiento</h1>
+        <p>Regiduría de Mérida</p>
     </div>
+</header>
 
-    <header>
-        <div class="brand">
-            <h1>Plataforma de Seguimiento</h1>
-            <p>Regiduría de Mérida</p>
+<div class="content">
+    <aside class="sidebar">
+        <div class="search-box">
+            <i data-lucide="search" size="18" color="#64748b"></i>
+            <input type="text" id="filterInput" placeholder="Busca tu colonia..." onkeyup="filtrar()">
         </div>
-        <div id="sync-status" style="font-size: 0.75rem; color: var(--gris); display: flex; align-items: center; gap: 5px;">
-            <i data-lucide="check-circle" size="14" color="#10b981"></i> Datos en vivo de Google Sheets
-        </div>
-    </header>
+        <div class="report-list" id="lista"></div>
+    </aside>
+    <div id="map"></div>
+</div>
 
-    <div class="content">
-        <aside class="sidebar">
-            <div class="search-box">
-                <i data-lucide="search" size="18" color="#64748b"></i>
-                <input type="text" id="filterInput" placeholder="Busca tu colonia (ej. Chuburná)..." onkeyup="filtrar()">
-            </div>
-            <div class="report-list" id="lista"></div>
-        </aside>
-        <div id="map"></div>
-    </div>
+<script>
+lucide.createIcons();
 
-    <script>
-        lucide.createIcons();
-        const map = L.map('map', { zoomControl: false }).setView([20.967, -89.623], 12);
-        L.control.zoom({ position: 'bottomright' }).addTo(map);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
+const map = L.map('map', { zoomControl: false }).setView([20.967, -89.623], 12);
+L.control.zoom({ position: 'bottomright' }).addTo(map);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
 
-        const URL_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRkEy6YtGU6girlcwubsaMtjWgHmpVUHpV1o0wOtm0xqE_34EfLeUyVigQyMJT9SNlvuvKXwD4MF5e7/pub?gid=337736091&single=true&output=csv";
+async function init() {
+    try {
+        const response = await fetch("data.json");
+        const reportes = await response.json();
 
-        async function init() {
-            try {
-                const response = await fetch(URL_CSV);
-                const dataText = await response.text();
-                const filas = dataText.split('\n').slice(1); // Omitir encabezado
+        renderizar(reportes);
+    } catch (e) {
+        console.error(e);
+        alert("Error cargando datos");
+    } finally {
+        document.getElementById('loader').style.display = 'none';
+    }
+}
 
-                const reportes = filas.map(fila => {
-                    const col = fila.split(',');
-                    // Mapeo sugerido según tu estructura de Excel:
-                    return {
-                        folio: col[0] || 'S/N',
-                        asunto: col[1] || 'Sin asunto',
-                        ciudadano: col[2] || 'Anónimo',
-                        colonia: col[3] || 'No especificada',
-                        status: (col[4] || 'abierto').toLowerCase().trim(),
-                        dependencia: col[5] || 'Pendiente',
-                        antiguedad: col[6] || 'Reciente',
-                        // Asumimos que agregas Latitud y Longitud al final o una columna con coordenadas
-                        coords: [parseFloat(col[7]) || 20.967, parseFloat(col[8]) || -89.623]
-                    };
-                }).filter(r => r.asunto !== 'Sin asunto');
+function renderizar(data) {
+    const lista = document.getElementById('lista');
+    lista.innerHTML = '';
 
-                renderizar(reportes);
-                document.getElementById('loader').style.opacity = '0';
-                setTimeout(() => document.getElementById('loader').style.display = 'none', 500);
-            } catch (e) {
-                console.error("Error cargando datos:", e);
-                alert("Hubo un problema al conectar con el servidor de datos.");
-            }
-        }
+    data.forEach(rep => {
+        const color = rep.status === 'cerrado' ? '#1e5d3b' : '#f59e0b';
 
-        function renderizar(data) {
-            const lista = document.getElementById('lista');
-            lista.innerHTML = '';
-            
-            data.forEach(rep => {
-                const color = rep.status === 'cerrado' ? '#1e5d3b' : '#f59e0b';
-                
-                // Card Sidebar
-                const card = document.createElement('div');
-                card.className = 'card';
-                card.innerHTML = `
-                    <span class="status ${rep.status}">${rep.status}</span>
-                    <h3 style="font-size:0.9rem;">${rep.asunto}</h3>
-                    <p style="font-size:0.75rem; color:var(--gris); margin-top:5px;">
-                        <b>Folio:</b> ${rep.folio} | <b>Colonia:</b> ${rep.colonia}
-                    </p>
-                `;
-                card.onclick = () => map.flyTo(rep.coords, 16);
-                lista.appendChild(card);
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+            <span class="status ${rep.status}">${rep.status}</span>
+            <h3>${rep.asunto}</h3>
+            <p><b>Colonia:</b> ${rep.colonia}</p>
+        `;
+        card.onclick = () => map.flyTo(rep.coords, 16);
+        lista.appendChild(card);
 
-                // Pin Mapa
-                L.circleMarker(rep.coords, {
-                    radius: 9, fillColor: color, color: "white", weight: 2, fillOpacity: 0.9
-                }).addTo(map).bindPopup(`
-                    <div style="padding:5px">
-                        <b style="color:${color}; text-transform:uppercase">${rep.status}</b><br>
-                        <b>Asunto:</b> ${rep.asunto}<br>
-                        <b>Dependencia:</b> ${rep.dependencia}<br>
-                        <hr style="margin:5px 0; border:0; border-top:1px solid #eee">
-                        <small>Folio: ${rep.folio} | ${rep.antiguedad}</small>
-                    </div>
-                `);
-            });
-        }
+        L.circleMarker(rep.coords, {
+            radius: 9,
+            fillColor: color,
+            color: "white",
+            weight: 2,
+            fillOpacity: 0.9
+        }).addTo(map);
+    });
+}
 
-        function filtrar() {
-            const val = document.getElementById('filterInput').value.toLowerCase();
-            document.querySelectorAll('.card').forEach(c => {
-                c.style.display = c.innerText.toLowerCase().includes(val) ? "block" : "none";
-            });
-        }
+function filtrar() {
+    const val = document.getElementById('filterInput').value.toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+        c.style.display = c.innerText.toLowerCase().includes(val) ? "block" : "none";
+    });
+}
 
-        init();
-    </script>
+init();
+</script>
 
-    <style>
-        .spin { animation: spin 2s linear infinite; }
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-    </style>
 </body>
 </html>
